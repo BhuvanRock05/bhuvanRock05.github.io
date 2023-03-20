@@ -1,0 +1,163 @@
+html {
+  height: 100%;
+  width: 100%;
+}
+:root{
+    --bgc: #2874f0;
+}
+*{
+    margin: 0;
+    padding: 0;
+}
+
+/*-------header------*/
+header{
+    background-color: var(--bgc);
+    color: white;
+    height: 54px;
+    width: 100vw;
+    overflow: hidden;
+}
+.logo{
+    display: flex;
+    align-items: center;
+}
+.logo img{
+    width: 88px;
+    padding: 0 25px;
+
+}
+nav{
+    display: flex;
+    height: 54px;
+    align-items: center;
+}
+nav ul{
+    height: 40px;
+}
+nav ul{
+    display: flex;
+    align-items: center;
+
+}
+nav ul li{
+    list-style: none;
+}
+nav ul li a{
+    text-decoration: none;
+    color: white;
+    padding: 0 12px;
+}
+nav ul li a :hover{
+    font-weight: bolder;
+}
+
+.search{
+    display: flex;
+    align-items: center;
+    margin-left: 5px;
+}
+.blue{
+    color: #8a919e;
+}
+input{
+    height: 17px;
+    padding: 5px;
+    border: none;
+    border-radius: 5px;
+    width: 40vw;
+}
+.icon {
+    position: relative;
+    left: -23px;
+}
+/*-------main--------*/
+
+.container{
+    min-height: calc(100vh - 40px - 40px);
+}
+.slider{
+    margin-top: 5px;
+    display: flex;
+    justify-content: center;
+    background: cover;
+    overflow: hidden;
+}
+.slider img{
+    height: 32vh;
+    width: 88vw;
+    background-size: cover;
+}
+.card-list-main{
+    margin: 2px 2px;
+    /*background-color: aqua;*/
+    /*display: flex;
+    flex-direction: row;*/
+
+}
+
+.card-list{
+    display: flex;
+    flex-direction: row;
+    overflow: scroll;
+    margin: 10px;
+}
+.all-cards{
+    margin: 5px;
+}
+.card{
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+/*     background-color: pink; */
+    width: 150px;
+    margin: 10px;
+    border-radius: 5px;
+    box-shadow: 0px 0px 11px #aaaf9d;
+}
+.card p{
+    margin: 2px 0;
+}
+h1{
+    font-size: 25px;
+    margin-left: 20px;
+
+    
+}
+/*----footer------*/
+footer{
+    height: 40px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100vw;
+    
+    background-color: var(--bgc);
+    color: white;
+}
+
+/*     Responsiveness    */
+
+
+
+@media screen and (max-width:800px){
+
+    nav{
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        height: 91px;
+    }
+
+    header{
+        height: 100px;
+    }
+
+    .logo img{
+        margin-top: 9px;
+    }
+
+    .card img{
+        width: 130px;
+    }
+}
