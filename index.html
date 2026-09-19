@@ -1,223 +1,556 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="en">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width">
-    <title>E-commerce</title>
-    <link href="style.css" rel="stylesheet" type="text/css" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Glowworm</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&display=swap">
+<style>
+  :root {
+    box-sizing: border-box;
+    --bg: #0d0b24;
+    --panel: rgba(24, 19, 56, 0.86);
+    --panel-line: rgba(255, 255, 255, 0.14);
+    --text: #f4f1ff;
+    --muted: #a9a3d1;
+    --accent: #ff5fa8;
+    --accent-ink: #2a0a1a;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  html, body {
+    height: 100%; margin: 0; overflow: hidden;
+    background: var(--bg); color: var(--text);
+    font-family: "Bricolage Grotesque", system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-user-select: none; user-select: none; touch-action: none;
+  }
+  canvas#game { position: fixed; inset: 0; display: block; cursor: crosshair; }
 
+  .hud { position: fixed; pointer-events: none; opacity: 0; transition: opacity .3s; }
+  body.playing .hud, body.dead .hud { opacity: 1; }
+
+  #score { left: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
+  #score .num { font-size: 44px; font-weight: 800; line-height: 1; letter-spacing: -0.02em; }
+  #score .lbl { color: var(--muted); font-size: 14px; margin-top: 4px; }
+
+  #board {
+    right: 16px; top: calc(14px + env(safe-area-inset-top, 0px));
+    width: 200px; background: var(--panel); border: 1px solid var(--panel-line);
+    border-radius: 14px; padding: 10px 12px; backdrop-filter: blur(6px);
+  }
+  #board h3 { margin: 0 0 6px; font-size: 13px; font-weight: 500; color: var(--muted); }
+  #board .row { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; padding: 2px 0; }
+  #board .row span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #board .row.me { color: var(--accent); font-weight: 800; }
+  #board .sep { color: var(--muted); text-align: center; line-height: 8px; }
+
+  #miniWrap { right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); width: 112px; height: 112px; }
+  #mini { width: 112px; height: 112px; border-radius: 50%; background: var(--panel); border: 1px solid var(--panel-line); }
+
+  #boostBtn {
+    position: fixed; left: 50%; transform: translateX(-50%);
+    bottom: calc(22px + env(safe-area-inset-bottom, 0px));
+    width: 84px; height: 84px; border-radius: 50%; border: 2px solid var(--panel-line);
+    background: var(--panel); color: var(--text); font: 800 15px "Bricolage Grotesque", system-ui, sans-serif;
+    display: none; align-items: center; justify-content: center; touch-action: none;
+  }
+  #boostBtn.on { background: var(--accent); color: var(--accent-ink); }
+  @media (pointer: coarse) { body.playing #boostBtn { display: flex; } #board { width: 150px; } }
+
+  .overlay {
+    position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+    padding: 20px; background: radial-gradient(ellipse at center, rgba(13,11,36,.35), rgba(13,11,36,.82));
+  }
+  body.menu .overlay#menu, body.dead .overlay#over { display: flex; }
+  .card {
+    width: min(420px, 100%); background: var(--panel); border: 1px solid var(--panel-line);
+    border-radius: 22px; padding: 30px 28px 26px; text-align: center; backdrop-filter: blur(10px);
+  }
+  .card h1 {
+    margin: 0; font-size: clamp(44px, 12vw, 64px); font-weight: 800; letter-spacing: -0.04em; line-height: .95;
+    background: linear-gradient(90deg, #ff5fa8, #ffb35f 40%, #6fe7ff 80%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .card p { margin: 12px 0 0; color: var(--muted); font-size: 15px; line-height: 1.5; }
+  .card input {
+    width: 100%; margin-top: 22px; padding: 14px 16px; border-radius: 12px; font: 500 17px inherit; font-family: inherit;
+    background: rgba(255,255,255,.07); color: var(--text); border: 1px solid var(--panel-line); text-align: center;
+    -webkit-user-select: text; user-select: text;
+  }
+  .card input:focus-visible, .card button:focus-visible { outline: 3px solid #6fe7ff; outline-offset: 2px; }
+  .card button {
+    width: 100%; margin-top: 12px; padding: 14px 16px; border: 0; border-radius: 12px; cursor: pointer;
+    font: 800 18px "Bricolage Grotesque", system-ui, sans-serif; background: var(--accent); color: var(--accent-ink);
+  }
+  .card button:active { transform: translateY(1px); }
+  .keys { margin-top: 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px; color: var(--muted); }
+  .keys div { background: rgba(255,255,255,.05); border-radius: 10px; padding: 9px 8px; }
+  .keys b { color: var(--text); font-weight: 800; display: block; margin-bottom: 2px; }
+  .stats { display: flex; justify-content: center; gap: 28px; margin-top: 18px; }
+  .stats .n { font-size: 34px; font-weight: 800; line-height: 1; }
+  .stats .l { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+  @media (max-width: 560px) { #board { width: 140px; padding: 8px 10px; } #board .row { font-size: 12px; } #miniWrap, #mini { width: 88px; height: 88px; } #score .num { font-size: 34px; } }
+  @media (prefers-reduced-motion: reduce) { .hud { transition: none; } }
+</style>
 </head>
+<body class="menu">
+<canvas id="game"></canvas>
 
-<body>
-    <header>
-        <nav>
-            <div class="logo">
-                <img
-                    src="https://static-assets-web.flixcart.com/fk-p-linchpin-web/fk-cp-zion/img/flipkart-plus_8d85f4.png" />
-            </div>
+<div class="hud" id="score"><div class="num" id="scoreNum">10</div><div class="lbl" id="scoreLbl">Your length</div></div>
+<div class="hud" id="board"><h3>Longest worms</h3><div id="rows"></div></div>
+<div class="hud" id="miniWrap"><canvas id="mini" width="224" height="224"></canvas></div>
+<button id="boostBtn" aria-label="Boost">Boost</button>
 
-            <ul>
-                <li><a href="Home">Home</a></li>
-                <li><a href="About">About</a></li>
-                <li><a href="Contact">Contact</a></li>
-            </ul>
-            <div class="search">
-                <input name="search-bar" placeholder="search" />
-                <div class="icon">
-                    <i class="fa-solid fa-magnifying-glass blue " id="lo"></i>
-                </div>
-            </div>
+<div class="overlay" id="menu">
+  <div class="card">
+    <h1>Glowworm</h1>
+    <p>Eat glowing orbs to grow. Trap other worms so they run into you and turn them into food.</p>
+    <input id="nameInput" maxlength="14" placeholder="Your name" autocomplete="off" aria-label="Your name">
+    <button id="playBtn">Play</button>
+    <div class="keys">
+      <div><b>Steer</b>Move mouse or drag</div>
+      <div><b>Boost</b>Hold click or Space</div>
+    </div>
+  </div>
+</div>
 
-        </nav>
-    </header>
-    <main>
-        <div class="container">
-            <div class="slider">
+<div class="overlay" id="over">
+  <div class="card">
+    <h1 style="font-size:clamp(34px,9vw,46px)" id="overTitle">You got eaten</h1>
+    <p id="overWhy"></p>
+    <div class="stats">
+      <div><div class="n" id="overLen">0</div><div class="l">Final length</div></div>
+      <div><div class="n" id="overBest">0</div><div class="l">Best length</div></div>
+    </div>
+    <button id="againBtn">Play again</button>
+  </div>
+</div>
 
-                <img
-                    src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQhYFlDJzVS591faksVckmOzRkuZaVx5FYGIjC1ZTXWxQ&usqp=CAU&ec=48600113" />
-            </div>
-            <div class="all-cards">
+<script>
+(() => {
+  const TAU = Math.PI * 2;
+  const R = 2800;              // world radius
+  const BOTS = 22;
+  const FOOD_TARGET = 950;
+  const BASE_SPEED = 2.4, BOOST_SPEED = 4.6;
 
-                <div class="card-list-main">
-                    <h1>Buds and bat</h1>
-                    <div class="card-list">
+  const cv = document.getElementById('game'), ctx = cv.getContext('2d');
+  const mm = document.getElementById('mini'), mctx = mm.getContext('2d');
+  let W = 0, H = 0, dpr = 1;
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    cv.width = W * dpr; cv.height = H * dpr;
+    cv.style.width = W + 'px'; cv.style.height = H + 'px';
+  }
+  window.addEventListener('resize', resize); resize();
 
-                        <div class="card">
-                            <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSf22bDBXuVyNNC8bv5ILbcKc-y8GepExoICjQ26svn_UTVcCUF&usqp=CAc"
-                                width="150px" />
-                            <p class="para">boat buds</p>
-                            <p class="para">50% off</p>
-                            <p class="para">purchase now</p>
+  const NAMES = ['Nova','Pip','Mosscap','Zigzag','Lumi','Orbit','Tango','Fizz','Juniper','Wisp','Comet','Bramble','Kiwi','Sable','Pixel','Noodle','Echo','Marlo','Dot','Vesper','Ozzy','Tilly','Rune','Miso','Blip','Ferris','Sprout','Quill'];
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const angDiff = (a, b) => ((b - a + Math.PI) % TAU + TAU) % TAU - Math.PI;
 
-                        </div>
+  let snakes = [], foods = [];
+  let player = null;
+  let state = 'menu';
+  let best = 0;
+  try { best = parseInt(localStorage.getItem('glowworm-best') || '0', 10) || 0; } catch (e) {}
+  try { const n = localStorage.getItem('glowworm-name'); if (n) document.getElementById('nameInput').value = n; } catch (e) {}
 
-                        <div class="card">
-                            <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT0hZAaj9RNx_cx7cB2b_0A9_kt0yeTqgV4UsaPLQbqnA&usqp=CAU&ec=48600113"
-                                width="150px" />
-                            <p class="para">bat</p>
-                            <p class="para">50% off</p>
-                            <p class="para">purchase now</p>
+  const radiusOf = s => Math.min(32, 8 + Math.sqrt(s.mass) * 0.55);
+  const targetSegs = s => 8 + Math.floor(s.mass * 0.8);
 
-                        </div>
-                        <div class="card">
-                            <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT0hZAaj9RNx_cx7cB2b_0A9_kt0yeTqgV4UsaPLQbqnA&usqp=CAU&ec=48600113"
-                                width="150px" />
-                            <p class="para">bat</p>
-                            <p class="para">50% off</p>
-                            <p class="para">purchase now</p>
+  function makeFood(x, y, v, r, hue) {
+    return { x, y, v, r, color: `hsl(${hue} 95% 66%)`, ph: Math.random() * TAU };
+  }
+  function randomFood() {
+    const a = rand(0, TAU), d = Math.sqrt(Math.random()) * (R - 50);
+    foods.push(makeFood(Math.cos(a) * d, Math.sin(a) * d, 1, rand(3.2, 5), Math.floor(rand(0, 360))));
+  }
 
-                        </div>
-                        <div class="card">
-                            <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT0hZAaj9RNx_cx7cB2b_0A9_kt0yeTqgV4UsaPLQbqnA&usqp=CAU&ec=48600113"
-                                width="150px" />
-                            <p class="para">bat</p>
-                            <p class="para">50% off</p>
-                            <p class="para">purchase now</p>
+  function setColors(s) {
+    s.c1 = `hsl(${s.hue} 88% 58%)`;
+    s.c2 = `hsl(${s.hue} 80% 47%)`;
+    s.glow = `hsla(${s.hue}, 100%, 65%, 0.16)`;
+  }
 
-                        </div>
-                        <div class="card">
-                                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT0hZAaj9RNx_cx7cB2b_0A9_kt0yeTqgV4UsaPLQbqnA&usqp=CAU&ec=48600113"
-                                    width="150px" />
-                                <p class="para">bat</p>
-                                <p class="para">50% off</p>
-                                <p class="para">purchase now</p>
+  function spawn(s, mass) {
+    let x = 0, y = 0;
+    for (let tries = 0; tries < 12; tries++) {
+      const a = rand(0, TAU), d = Math.sqrt(Math.random()) * (R * 0.8);
+      x = Math.cos(a) * d; y = Math.sin(a) * d;
+      let ok = true;
+      for (const o of snakes) {
+        if (o === s || !o.alive) continue;
+        if (Math.hypot(o.x - x, o.y - y) < 500) { ok = false; break; }
+      }
+      if (ok) break;
+    }
+    s.x = x; s.y = y; s.angle = rand(0, TAU); s.want = s.angle;
+    s.mass = mass; s.alive = true; s.boosting = false; s.boostAcc = 0; s.think = Math.floor(rand(0, 8));
+    s.segs = [];
+    const sp = radiusOf(s) * 0.75;
+    for (let i = 0; i < targetSegs(s); i++) {
+      s.segs.push({ x: x - Math.cos(s.angle) * sp * i, y: y - Math.sin(s.angle) * sp * i });
+    }
+  }
 
-                            </div>
-                            <div class="card">
-                                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT0hZAaj9RNx_cx7cB2b_0A9_kt0yeTqgV4UsaPLQbqnA&usqp=CAU&ec=48600113"
-                                    width="150px" />
-                                <p class="para">bat</p>
-                                <p class="para">50% off</p>
-                                <p class="para">purchase now</p>
+  function newBot() {
+    const s = { name: NAMES[Math.floor(Math.random() * NAMES.length)], hue: Math.floor(rand(0, 360)), isPlayer: false,
+      aggr: Math.random() < 0.4, respawnAt: 0, alive: false, segs: [], mass: 10 };
+    setColors(s);
+    spawn(s, rand(10, 45));
+    return s;
+  }
 
-                            </div>
-                    </div>
-                    <div class="card-list-main">
-                        <h1>Best Phones and more</h1>
-                        <div class="card-list">
+  function initWorld() {
+    snakes = []; foods = [];
+    for (let i = 0; i < FOOD_TARGET; i++) randomFood();
+    for (let i = 0; i < BOTS; i++) snakes.push(newBot());
+  }
 
-                            <div class="card">
-                                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR4RBNcvtysdr5iA8zMSJgtjrbH6DvOD428aGxR5dmHVg&usqp=CAU&ec=48600113"
-                                    width="150px" />
-                                <p class="para">Nothing phone 1</p>
-                                <p class="para">50% off</p>
-                                <p class="para">purchase now</p>
+  // ---------- Death ----------
+  function kill(s, by, reason) {
+    if (!s.alive) return;
+    s.alive = false;
+    const n = s.segs.length;
+    const total = s.mass * 0.75;
+    const drops = Math.max(1, Math.floor(n / 2));
+    const per = total / drops;
+    for (let i = 0; i < n; i += 2) {
+      const g = s.segs[i];
+      foods.push(makeFood(g.x + rand(-8, 8), g.y + rand(-8, 8), per, clamp(4 + per * 1.4, 4, 10), s.hue + rand(-15, 15)));
+    }
+    if (s.isPlayer) {
+      const final = Math.floor(s.mass);
+      if (final > best) { best = final; try { localStorage.setItem('glowworm-best', String(best)); } catch (e) {} }
+      state = 'dead';
+      setTimeout(() => {
+        if (state !== 'dead') return;
+        document.getElementById('overLen').textContent = final;
+        document.getElementById('overBest').textContent = best;
+        document.getElementById('overTitle').textContent = reason === 'wall' ? 'You hit the edge' : 'You got eaten';
+        document.getElementById('overWhy').textContent = reason === 'wall' ? 'The glowing border is deadly. Keep clear of it.' : `${by ? by.name : 'Another worm'} caught you.`;
+        document.body.className = 'dead';
+      }, 900);
+    } else {
+      s.respawnAt = performance.now() + 2500;
+    }
+  }
 
-                            </div>
+  // ---------- Bot AI ----------
+  function think(s) {
+    const r = radiusOf(s);
+    let des = s.angle + (Math.random() - 0.5) * 0.8;
+    let boost = false;
 
-                            <div class="card">
-                                <img src="https://www.reliancedigital.in/medias/Oppo-A57-Smart-Phones-492850647-i-492850647-1-1200Wx1200H-300Wx300H?context=bWFzdGVyfGltYWdlc3w1NjU1M3xpbWFnZS9qcGVnfGltYWdlcy9oOTcvaGIyLzk4NDcyMjg0NjUxODIuanBnfDAyYzY4OTY5ZmJkMzU1NjlmNGUwNjQ4YzE4ZjJlZDk3ZDBjMWEwOTU5ZmI0ZGEzNzRjMzU1NmFmNjlmYTA3Njk&w=206&h=206"
-                                    width="150px" />
-                                <p class="para">oppo A57</p>
-                                <p class="para">25% off</p>
-                                <p class="para">purchase now</p>
+    // food
+    let best = 1e12, bf = null;
+    const lim = 520 * 520;
+    for (let i = 0; i < foods.length; i++) {
+      const f = foods[i], dx = f.x - s.x, dy = f.y - s.y, d2 = dx * dx + dy * dy;
+      if (d2 > lim) continue;
+      const sc = d2 / (1 + f.v * 1.2);
+      if (sc < best) { best = sc; bf = f; }
+    }
+    if (bf) des = Math.atan2(bf.y - s.y, bf.x - s.x);
 
-                            </div>
-                            <div class="card">
-                                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT0hZAaj9RNx_cx7cB2b_0A9_kt0yeTqgV4UsaPLQbqnA&usqp=CAU&ec=48600113"
-                                    width="150px" />
-                                <p class="para">bat</p>
-                                <p class="para">50% off</p>
-                                <p class="para">purchase now</p>
+    // hunt smaller snakes / avoid bodies
+    let threat = null, td = 1e12, prey = null, pd = 1e12;
+    for (const o of snakes) {
+      if (o === s || !o.alive) continue;
+      const hx = o.x - s.x, hy = o.y - s.y, hd = Math.hypot(hx, hy);
+      if (s.aggr && s.mass > o.mass * 1.5 && hd < 450 && hd < pd) { pd = hd; prey = o; }
+      if (hd > o.segs.length * radiusOf(o) * 0.75 + 260) continue;
+      const lim2 = (110 + r + radiusOf(o)) ** 2;
+      for (let i = 0; i < o.segs.length; i += 2) {
+        const g = o.segs[i], dx = g.x - s.x, dy = g.y - s.y, d2 = dx * dx + dy * dy;
+        if (d2 < lim2 && d2 < td) { td = d2; threat = g; }
+      }
+    }
+    if (prey) {
+      des = Math.atan2(prey.y + Math.sin(prey.angle) * 170 - s.y, prey.x + Math.cos(prey.angle) * 170 - s.x);
+      boost = pd < 260 && s.mass > 40;
+    }
+    if (threat) {
+      des = Math.atan2(s.y - threat.y, s.x - threat.x);
+      boost = s.mass > 30;
+    }
+    const wd = Math.hypot(s.x, s.y);
+    if (wd > R - 320) { des = Math.atan2(-s.y, -s.x); boost = false; }
+    s.want = des; s.boosting = boost;
+  }
 
-                            </div>
-                            <div class="card">
-                                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT0hZAaj9RNx_cx7cB2b_0A9_kt0yeTqgV4UsaPLQbqnA&usqp=CAU&ec=48600113"
-                                    width="150px" />
-                                <p class="para">bat</p>
-                                <p class="para">50% off</p>
-                                <p class="para">purchase now</p>
+  // ---------- Input ----------
+  const input = { x: 0, y: 0, boost: false, has: false };
+  window.addEventListener('pointermove', e => { input.x = e.clientX; input.y = e.clientY; input.has = true; });
+  window.addEventListener('pointerdown', e => {
+    input.x = e.clientX; input.y = e.clientY; input.has = true;
+    if (e.pointerType === 'mouse' && e.target === cv) input.boost = true;
+  });
+  window.addEventListener('pointerup', e => { if (e.pointerType === 'mouse') input.boost = false; });
+  window.addEventListener('keydown', e => {
+    if (e.code === 'Space' && document.activeElement !== document.getElementById('nameInput')) { input.boost = true; e.preventDefault(); }
+    if (e.code === 'Enter') {
+      if (state === 'menu') startGame();
+      else if (state === 'dead' && document.body.className === 'dead') startGame();
+    }
+  });
+  window.addEventListener('keyup', e => { if (e.code === 'Space') input.boost = false; });
+  const bb = document.getElementById('boostBtn');
+  const bOn = e => { e.preventDefault(); input.boost = true; bb.classList.add('on'); };
+  const bOff = () => { input.boost = false; bb.classList.remove('on'); };
+  bb.addEventListener('pointerdown', bOn);
+  bb.addEventListener('pointerup', bOff); bb.addEventListener('pointercancel', bOff); bb.addEventListener('pointerleave', bOff);
 
-                            </div>
-                            <div class="card">
-                                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT0hZAaj9RNx_cx7cB2b_0A9_kt0yeTqgV4UsaPLQbqnA&usqp=CAU&ec=48600113"
-                                    width="150px" />
-                                <p class="para">bat</p>
-                                <p class="para">50% off</p>
-                                <p class="para">purchase now</p>
+  function startGame() {
+    const nameEl = document.getElementById('nameInput');
+    const name = (nameEl.value.trim() || 'You').slice(0, 14);
+    try { localStorage.setItem('glowworm-name', name); } catch (e) {}
+    if (player) snakes = snakes.filter(s => s !== player);
+    player = { name, hue: 335, isPlayer: true, alive: false, segs: [], mass: 10 };
+    setColors(player);
+    spawn(player, 10);
+    snakes.push(player);
+    state = 'play';
+    document.body.className = 'playing';
+    input.boost = false;
+    if (!input.has) { input.x = W * 0.75; input.y = H / 2; }
+  }
+  document.getElementById('playBtn').addEventListener('click', startGame);
+  document.getElementById('againBtn').addEventListener('click', startGame);
 
-                            </div>
-                            <div class="card">
-                                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT0hZAaj9RNx_cx7cB2b_0A9_kt0yeTqgV4UsaPLQbqnA&usqp=CAU&ec=48600113"
-                                    width="150px" />
-                                <p class="para">bat</p>
-                                <p class="para">50% off</p>
-                                <p class="para">purchase now</p>
+  // ---------- Update ----------
+  function moveSnake(s, dt) {
+    const r = radiusOf(s);
+    const turn = 0.11 * Math.pow(9 / r, 0.35) * dt;
+    s.angle += clamp(angDiff(s.angle, s.want), -turn, turn);
+    const boosting = s.boosting && s.mass > 12;
+    s.isBoosting = boosting;
+    const sp = (boosting ? BOOST_SPEED : BASE_SPEED) * dt;
+    s.x += Math.cos(s.angle) * sp; s.y += Math.sin(s.angle) * sp;
 
-                            </div>
-                        </div>
-                    </div>
+    if (boosting) {
+      s.boostAcc += dt;
+      if (s.boostAcc >= 7) {
+        s.boostAcc -= 7; s.mass = Math.max(10, s.mass - 1);
+        const t = s.segs[s.segs.length - 1];
+        foods.push(makeFood(t.x + rand(-4, 4), t.y + rand(-4, 4), 1, 3.6, s.hue));
+      }
+    }
 
+    const sg = s.segs, sx = r * 0.75;
+    sg[0].x = s.x; sg[0].y = s.y;
+    for (let i = 1; i < sg.length; i++) {
+      const p = sg[i - 1], q = sg[i];
+      const dx = p.x - q.x, dy = p.y - q.y, d = Math.hypot(dx, dy);
+      if (d > sx) { const k = (d - sx) / d; q.x += dx * k; q.y += dy * k; }
+    }
+    const tn = targetSegs(s);
+    while (sg.length < tn) { const l = sg[sg.length - 1]; sg.push({ x: l.x, y: l.y }); }
+    while (sg.length > tn) sg.pop();
+  }
 
-                    <div class="card-list-main">
-                        <h1>Best Laptops and more</h1>
-                        <div class="card-list">
+  function eat(s) {
+    const r = radiusOf(s), magR = r + 55, magR2 = magR * magR;
+    for (let i = foods.length - 1; i >= 0; i--) {
+      const f = foods[i], dx = s.x - f.x, dy = s.y - f.y, d2 = dx * dx + dy * dy;
+      if (d2 > magR2) continue;
+      const d = Math.sqrt(d2);
+      if (d < r + f.r * 0.6) {
+        s.mass += f.v;
+        foods[i] = foods[foods.length - 1]; foods.pop();
+      } else {
+        const k = 0.16;
+        f.x += dx * k; f.y += dy * k;
+      }
+    }
+  }
 
-                            <div class="card">
-                                <img src="https://images.prismic.io/frameworkmarketplace/46cbf974-cdff-4cd8-b761-8b4a3343f6c4_FW-chromebook-homepage-carousel.png?auto=compress,format"
-                                    width="150px" />
-                                <p class="para">HP 15s</p>
-                                <p class="para">50% off</p>
-                                <p class="para">purchase now</p>
+  function collisions() {
+    const dead = [];
+    for (const s of snakes) {
+      if (!s.alive) continue;
+      if (Math.hypot(s.x, s.y) > R - 6) { dead.push([s, null, 'wall']); continue; }
+      const r = radiusOf(s);
+      for (const o of snakes) {
+        if (o === s || !o.alive) continue;
+        const ro = radiusOf(o);
+        const reach = o.segs.length * ro * 0.75 + 80;
+        if (Math.abs(o.x - s.x) > reach || Math.abs(o.y - s.y) > reach) continue;
+        const lim = (r + ro) * 0.68, lim2 = lim * lim;
+        let hit = false;
+        for (let i = 1; i < o.segs.length; i++) {
+          const g = o.segs[i], dx = g.x - s.x, dy = g.y - s.y;
+          if (dx * dx + dy * dy < lim2) { hit = true; break; }
+        }
+        if (hit) { dead.push([s, o, 'snake']); break; }
+      }
+    }
+    for (const [s, by, why] of dead) kill(s, by, why);
+  }
 
-                            </div>
+  let camX = 0, camY = 0, camZ = 1, demo = null;
+  function update(dt, now) {
+    for (const s of snakes) {
+      if (!s.alive) {
+        if (!s.isPlayer && now > s.respawnAt) { s.name = NAMES[Math.floor(Math.random() * NAMES.length)]; s.hue = Math.floor(rand(0, 360)); setColors(s); s.aggr = Math.random() < 0.4; spawn(s, rand(10, 40)); }
+        continue;
+      }
+      if (s.isPlayer) {
+        if (state === 'play') {
+          const dx = input.x - W / 2, dy = input.y - H / 2;
+          if (dx * dx + dy * dy > 16) s.want = Math.atan2(dy, dx);
+          s.boosting = input.boost;
+        }
+      } else if (--s.think <= 0) { s.think = 6 + Math.floor(Math.random() * 4); think(s); }
+      moveSnake(s, dt);
+      eat(s);
+    }
+    collisions();
+    for (let i = 0; i < 6 && foods.length < FOOD_TARGET; i++) randomFood();
 
-                            <div class="card">
-                                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT0hZAaj9RNx_cx7cB2b_0A9_kt0yeTqgV4UsaPLQbqnA&usqp=CAU&ec=48600113"
-                                    width="150px" />
-                                <p class="para">bat</p>
-                                <p class="para">50% off</p>
-                                <p class="para">purchase now</p>
+    // camera
+    let tx = camX, ty = camY, target = null;
+    if (player && player.alive) target = player;
+    else if (state === 'menu' || state === 'dead') {
+      if (!demo || !demo.alive) demo = snakes.filter(s => s.alive && !s.isPlayer).sort((a, b) => b.mass - a.mass)[0] || null;
+      target = demo;
+    }
+    if (target) { tx = target.x; ty = target.y; }
+    camX += (tx - camX) * Math.min(1, 0.18 * dt); camY += (ty - camY) * Math.min(1, 0.18 * dt);
+    const ref = (player && player.alive) ? player : (target || { mass: 10 });
+    const base = clamp(Math.min(W, H) / 750, 0.6, 1.2);
+    const tz = clamp(base * Math.pow(10 / radiusOf(ref), 0.55), 0.28, 1.3);
+    camZ += (tz - camZ) * Math.min(1, 0.05 * dt);
+  }
 
-                            </div>
-                            <div class="card">
-                                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT0hZAaj9RNx_cx7cB2b_0A9_kt0yeTqgV4UsaPLQbqnA&usqp=CAU&ec=48600113"
-                                    width="150px" />
-                                <p class="para">bat</p>
-                                <p class="para">50% off</p>
-                                <p class="para">purchase now</p>
+  // ---------- Draw ----------
+  function drawSnake(s, vx0, vy0, vx1, vy1, z, t) {
+    const r = radiusOf(s), sg = s.segs;
+    if (s.isBoosting) {
+      ctx.fillStyle = s.glow;
+      for (let i = sg.length - 1; i >= 0; i -= 3) {
+        const g = sg[i];
+        if (g.x < vx0 || g.x > vx1 || g.y < vy0 || g.y > vy1) continue;
+        ctx.beginPath(); ctx.arc(g.x, g.y, r * 2.1, 0, TAU); ctx.fill();
+      }
+    }
+    for (let i = sg.length - 1; i >= 0; i--) {
+      const g = sg[i];
+      if (g.x < vx0 - r || g.x > vx1 + r || g.y < vy0 - r || g.y > vy1 + r) continue;
+      ctx.fillStyle = (i % 6 < 3) ? s.c1 : s.c2;
+      ctx.beginPath(); ctx.arc(g.x, g.y, i === 0 ? r * 1.05 : r, 0, TAU); ctx.fill();
+    }
+    // eyes
+    const h = sg[0];
+    if (h.x > vx0 - r * 3 && h.x < vx1 + r * 3 && h.y > vy0 - r * 3 && h.y < vy1 + r * 3) {
+      for (const side of [-1, 1]) {
+        const ea = s.angle + side * 0.7;
+        const ex = h.x + Math.cos(ea) * r * 0.62, ey = h.y + Math.sin(ea) * r * 0.62;
+        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ex, ey, r * 0.36, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#1a1230'; ctx.beginPath();
+        ctx.arc(ex + Math.cos(s.angle) * r * 0.14, ey + Math.sin(s.angle) * r * 0.14, r * 0.19, 0, TAU); ctx.fill();
+      }
+      ctx.font = `800 ${Math.round(13 / z)}px "Bricolage Grotesque", system-ui, sans-serif`;
+      ctx.textAlign = 'center'; ctx.fillStyle = s.isPlayer ? '#fff' : 'rgba(255,255,255,.8)';
+      ctx.fillText(s.name, h.x, h.y - r - 12 / z);
+    }
+  }
 
-                            </div>
-                            <div class="card">
-                                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT0hZAaj9RNx_cx7cB2b_0A9_kt0yeTqgV4UsaPLQbqnA&usqp=CAU&ec=48600113"
-                                    width="150px" />
-                                <p class="para">bat</p>
-                                <p class="para">50% off</p>
-                                <p class="para">purchase now</p>
+  function draw() {
+    const t = performance.now() / 1000;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = '#080618'; ctx.fillRect(0, 0, W, H);
 
-                            </div>
-                            <div class="card">
-                                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT0hZAaj9RNx_cx7cB2b_0A9_kt0yeTqgV4UsaPLQbqnA&usqp=CAU&ec=48600113"
-                                    width="150px" />
-                                <p class="para">bat</p>
-                                <p class="para">50% off</p>
-                                <p class="para">purchase now</p>
+    ctx.save();
+    ctx.translate(W / 2, H / 2); ctx.scale(camZ, camZ); ctx.translate(-camX, -camY);
+    const vx0 = camX - W / 2 / camZ, vx1 = camX + W / 2 / camZ, vy0 = camY - H / 2 / camZ, vy1 = camY + H / 2 / camZ;
 
-                            </div>
-                            <div class="card">
-                                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT0hZAaj9RNx_cx7cB2b_0A9_kt0yeTqgV4UsaPLQbqnA&usqp=CAU&ec=48600113"
-                                    width="150px" />
-                                <p class="para">bat</p>
-                                <p class="para">50% off</p>
-                                <p class="para">purchase now</p>
+    // arena
+    ctx.fillStyle = '#171236'; ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.fill();
 
-                            </div>
-                        </div>
-                    </div>
+    // dot grid
+    const gs = 80;
+    ctx.fillStyle = 'rgba(160,150,255,0.16)';
+    ctx.beginPath();
+    for (let x = Math.floor(vx0 / gs) * gs; x < vx1; x += gs) {
+      for (let y = Math.floor(vy0 / gs) * gs; y < vy1; y += gs) {
+        if (x * x + y * y < (R - 10) * (R - 10)) ctx.rect(x - 2, y - 2, 4, 4);
+      }
+    }
+    ctx.fill();
 
-                </div>
+    // border
+    ctx.lineWidth = 60; ctx.strokeStyle = 'rgba(255,95,168,0.10)';
+    ctx.beginPath(); ctx.arc(0, 0, R - 30, 0, TAU); ctx.stroke();
+    ctx.lineWidth = 10; ctx.strokeStyle = '#ff5fa8';
+    ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.stroke();
 
-            </div>
-    </main>
-    <footer>
-        copyright &copy; 2023
-    </footer>
-    <script src="script.js"></script>
-    <script src="https://kit.fontawesome.com/6e5361f5c9.js" crossorigin="anonymous"></script>
+    // food
+    for (const f of foods) {
+      if (f.x < vx0 - 20 || f.x > vx1 + 20 || f.y < vy0 - 20 || f.y > vy1 + 20) continue;
+      const pr = f.r * (1 + 0.14 * Math.sin(t * 3 + f.ph));
+      ctx.fillStyle = f.color;
+      ctx.globalAlpha = 0.22; ctx.beginPath(); ctx.arc(f.x, f.y, pr * 2.1, 0, TAU); ctx.fill();
+      ctx.globalAlpha = 1; ctx.beginPath(); ctx.arc(f.x, f.y, pr, 0, TAU); ctx.fill();
+    }
 
+    // snakes: smaller first so big ones draw on top
+    const order = snakes.filter(s => s.alive).sort((a, b) => a.mass - b.mass);
+    for (const s of order) drawSnake(s, vx0, vy0, vx1, vy1, camZ, t);
+    ctx.restore();
+  }
 
+  // ---------- HUD ----------
+  const rowsEl = document.getElementById('rows');
+  const scoreNum = document.getElementById('scoreNum');
+  function esc(s) { return s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+  function updateBoard() {
+    const alive = snakes.filter(s => s.alive).sort((a, b) => b.mass - a.mass);
+    let html = '';
+    alive.slice(0, 8).forEach((s, i) => {
+      html += `<div class="row${s === player ? ' me' : ''}"><span>${i + 1}. ${esc(s.name)}</span><span>${Math.floor(s.mass)}</span></div>`;
+    });
+    if (player && player.alive) {
+      const rank = alive.indexOf(player);
+      if (rank >= 8) html += `<div class="sep">···</div><div class="row me"><span>${rank + 1}. ${esc(player.name)}</span><span>${Math.floor(player.mass)}</span></div>`;
+    }
+    rowsEl.innerHTML = html;
+  }
+  function drawMini() {
+    const S = 224, c = S / 2, k = (c - 4) / R;
+    mctx.clearRect(0, 0, S, S);
+    mctx.strokeStyle = 'rgba(255,95,168,.8)'; mctx.lineWidth = 3;
+    mctx.beginPath(); mctx.arc(c, c, c - 4, 0, TAU); mctx.stroke();
+    for (const s of snakes) {
+      if (!s.alive || s === player) continue;
+      mctx.fillStyle = s.c1; mctx.beginPath(); mctx.arc(c + s.x * k, c + s.y * k, 3.5, 0, TAU); mctx.fill();
+    }
+    if (player && player.alive) {
+      mctx.fillStyle = '#fff'; mctx.beginPath(); mctx.arc(c + player.x * k, c + player.y * k, 6, 0, TAU); mctx.fill();
+    }
+  }
+
+  // ---------- Loop ----------
+  initWorld();
+  let last = performance.now(), boardT = 0;
+  function frame(ts) {
+    const dt = Math.min((ts - last) / 16.667, 2.5); last = ts;
+    update(dt, ts);
+    draw();
+    if (state !== 'menu') {
+      if (player) scoreNum.textContent = Math.floor(player.mass);
+      drawMini();
+      if (ts - boardT > 400) { boardT = ts; updateBoard(); }
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
 </body>
-
 </html>
